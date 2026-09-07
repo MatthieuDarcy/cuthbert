@@ -4,6 +4,7 @@ from jax import numpy as jnp
 from jax import tree, vmap
 
 from cuthbert.factorial.types import Extract
+from cuthbert.utils import dummy_tree_like
 from cuthbertlib.types import ArrayLike, ArrayTree, ArrayTreeLike
 
 
@@ -30,7 +31,9 @@ def serial_to_factorial(
             maximum index, preserving the behaviour of earlier versions.
         init_factorial_tree: Optional initial factorial tree to use, as the first
             element of each returned tree.
-            Leaves with shape (F, ...)
+            Leaves with shape (F, ...). Subtrees that are None in the initial
+            tree (such as model_inputs) are padded with dummy values matching
+            the history.
 
     Returns:
         A single tree when a single index is selected; otherwise, a list of trees in the
@@ -72,12 +75,27 @@ def serial_to_factorial(
             return factor_states
 
         initial_state = extract(init_factorial_tree, factorial_index)
+
+        def prepend_initial(initial, history):
+            if initial is None:
+                # Infer shapes without indexing: this factor may have no history.
+                initial = tree.map(
+                    lambda leaf: dummy_tree_like(
+                        jnp.empty(leaf.shape[1:], dtype=leaf.dtype)
+                    ),
+                    history,
+                )
+            return tree.map(
+                lambda first, rest: jnp.concatenate([first[None], rest]),
+                initial,
+                history,
+            )
+
         return tree.map(
-            lambda initial_leaf, history_leaf: jnp.concatenate(
-                [initial_leaf[None], history_leaf]
-            ),
+            prepend_initial,
             initial_state,
             factor_states,
+            is_leaf=lambda leaf: leaf is None,
         )
 
     factorial_trees = [

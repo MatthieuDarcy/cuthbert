@@ -12,12 +12,14 @@ from cuthbertlib.types import Array, ArrayTreeLike, KeyArray
 class InitSample(Protocol):
     """Protocol for sampling from the initial distribution."""
 
-    def __call__(self, key: KeyArray, model_inputs: ArrayTreeLike) -> Array:
+    def __call__(self, key: KeyArray) -> Array:
         """Sample from the initial distribution.
+
+        Initial parameters must be captured by the callable, for example with
+        a closure or `functools.partial`.
 
         Args:
             key: JAX PRNG key.
-            model_inputs: Model inputs.
 
         Returns:
             Sample from the initial distribution, shape (x_dim,).
