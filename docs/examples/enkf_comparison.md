@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 from jax import jit, random
 
 from cuthbert import filter as run_filter
-from cuthbert.enkf import ensemble_kalman_filter
+from cuthbert.ensemble_kalman import ensemble_kalman_filter
 from cuthbert.gaussian import taylor
 from cuthbert.gaussian.types import LinearizedKalmanFilterState
 from cuthbert.smc import particle_filter
@@ -453,6 +453,7 @@ Under the settings that we used, the EnKF has comparable computational demand to
 
 - **Play With `dt`**: Shrink `n_inner_steps` toward 1–2 steps to see the EKF recover as linearization becomes accurate again, or raise it further and see EKF completely collapse.
 - **Play With Particles**: Increase `n_filter_particles` for the particle filter and see the PF avoid collapse across a longer time horizon.
+- **Spatial localization**: Continue with the [Lorenz–96 localization tutorial](enkf_localization_l96.md) to see how localization can help estimation with the EnKF to large state spaces with small ensemble sizes.
 - **Parameter learning**: Use `jax.grad` through the EnKF's differentiable log-likelihood to learn Lorenz-63 parameters ($\sigma$, $\rho$, $\beta$) from data.
 - **More examples**: Check out the other [examples](index.md).
 

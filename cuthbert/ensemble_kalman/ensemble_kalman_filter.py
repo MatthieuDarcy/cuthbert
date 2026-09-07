@@ -11,16 +11,25 @@ import jax
 import jax.numpy as jnp
 from jax import random, tree
 
-from cuthbert.enkf.types import (
+from cuthbert.ensemble_kalman.types import (
+    ConstructCholInnovationCovariance,
     GetEnKFDynamics,
     GetEnKFObservations,
     InitSample,
+    ModifyCrossCovariance,
 )
 from cuthbert.inference import Filter
 from cuthbert.utils import dummy_tree_like
-from cuthbertlib import enkf as enkf_lib
+from cuthbertlib import ensemble_kalman as enkf_lib
 from cuthbertlib.linalg import tria
 from cuthbertlib.types import Array, ArrayTree, ArrayTreeLike, KeyArray, ScalarArray
+
+
+def no_covariance_modifier(
+    cross_covariance: Array, model_inputs: ArrayTreeLike
+) -> Array:
+    """Return an empirical covariance unchanged."""
+    return cross_covariance
 
 
 class EnKFState(NamedTuple):
@@ -30,6 +39,7 @@ class EnKFState(NamedTuple):
     ensemble: Array
     model_inputs: ArrayTree
     log_normalizing_constant: ScalarArray
+    predicted_ensemble: Array | None = None
 
     @property
     def n_particles(self) -> int:
@@ -63,6 +73,10 @@ def build_filter(
     n_particles: int,
     inflation: float = 0.0,
     perturbed_obs: bool = True,
+    store_predicted_ensemble: bool = False,
+    modify_cross_covariance: ModifyCrossCovariance = no_covariance_modifier,
+    construct_chol_innovation_covariance: ConstructCholInnovationCovariance
+    | None = None,
 ) -> Filter:
     """Builds an Ensemble Kalman Filter object.
 
@@ -71,8 +85,17 @@ def build_filter(
         get_dynamics: Function to get dynamics function (x_t, key) -> x_{t+1} ~ p(x_{t+1} | x_t) from model inputs.
         get_observations: Function to get observation function, chol_R, and y from model inputs.
         n_particles: Number of particles.
-        inflation: Multiplicative inflation factor for ensemble deviations.
+        inflation: Multiplicative inflation factor for ensemble deviations, applied in the predict step.
         perturbed_obs: If True, use perturbed observations (stochastic EnKF).
+        store_predicted_ensemble: Whether to store the incoming forecast ensemble
+            in each filter state, as required by the EnRTS smoother.
+        modify_cross_covariance: Function that modifies the empirical
+            state-observation cross-covariance in the update step. Defaults to
+            the identity.
+        construct_chol_innovation_covariance: Optional function that
+            constructs a generalized Cholesky factor of the localized innovation
+            covariance matrix. ``None`` (default) uses the standard, unlocalized
+            form of the ensemble Kalman update.
 
     Returns:
         Filter object for the EnKF.
@@ -88,11 +111,13 @@ def build_filter(
             init_prepare,
             init_sample=init_sample,
             n_particles=n_particles,
+            store_predicted_ensemble=store_predicted_ensemble,
         ),
         filter_prepare=partial(
             filter_prepare,
             init_sample=init_sample,
             n_particles=n_particles,
+            store_predicted_ensemble=store_predicted_ensemble,
         ),
         filter_combine=partial(
             filter_combine,
@@ -100,6 +125,9 @@ def build_filter(
             get_observations=get_observations,
             inflation=inflation,
             perturbed_obs=perturbed_obs,
+            store_predicted_ensemble=store_predicted_ensemble,
+            modify_cross_covariance=modify_cross_covariance,
+            construct_chol_innovation_covariance=(construct_chol_innovation_covariance),
         ),
         associative=False,
     )
@@ -109,6 +137,7 @@ def init_prepare(
     model_inputs: ArrayTreeLike,
     init_sample: InitSample,
     n_particles: int,
+    store_predicted_ensemble: bool = False,
     key: KeyArray | None = None,
 ) -> EnKFState:
     """Prepare the initial state for the EnKF.
@@ -117,6 +146,7 @@ def init_prepare(
         model_inputs: Model inputs.
         init_sample: Function to sample from the initial distribution from key and model inputs.
         n_particles: Number of particles.
+        store_predicted_ensemble: Whether to store incoming forecast ensembles.
         key: JAX random key.
 
     Returns:
@@ -132,12 +162,14 @@ def init_prepare(
     # Sample ensemble from initial distribution
     keys = random.split(key, n_particles)
     ensemble = jax.vmap(init_sample, (0, None))(keys, model_inputs)
+    predicted_ensemble = dummy_tree_like(ensemble) if store_predicted_ensemble else None
 
     return EnKFState(
         key=key,
         ensemble=ensemble,
         model_inputs=model_inputs,
         log_normalizing_constant=jnp.array(0.0),
+        predicted_ensemble=predicted_ensemble,
     )
 
 
@@ -145,6 +177,7 @@ def filter_prepare(
     model_inputs: ArrayTreeLike,
     init_sample: InitSample,
     n_particles: int,
+    store_predicted_ensemble: bool = False,
     key: KeyArray | None = None,
 ) -> EnKFState:
     """Prepare a state for an EnKF step.
@@ -153,6 +186,7 @@ def filter_prepare(
         model_inputs: Model inputs.
         init_sample: Function to sample from the initial distribution from key and model inputs.
         n_particles: Number of particles.
+        store_predicted_ensemble: Whether to store incoming forecast ensembles.
         key: JAX random key.
 
     Returns:
@@ -170,12 +204,14 @@ def filter_prepare(
     x_dim = dummy_particle.shape[0]
     ensemble = jnp.empty((n_particles, x_dim))
     ensemble = dummy_tree_like(ensemble)
+    predicted_ensemble = ensemble if store_predicted_ensemble else None
 
     return EnKFState(
         key=key,
         ensemble=ensemble,
         model_inputs=model_inputs,
         log_normalizing_constant=jnp.array(0.0),
+        predicted_ensemble=predicted_ensemble,
     )
 
 
@@ -186,6 +222,10 @@ def filter_combine(
     get_observations: GetEnKFObservations,
     inflation: float = 0.0,
     perturbed_obs: bool = True,
+    store_predicted_ensemble: bool = False,
+    modify_cross_covariance: ModifyCrossCovariance = no_covariance_modifier,
+    construct_chol_innovation_covariance: ConstructCholInnovationCovariance
+    | None = None,
 ) -> EnKFState:
     """Combine previous EnKF state with prepared state for current step.
 
@@ -198,6 +238,14 @@ def filter_combine(
         get_observations: Function to get observation function, chol_R, and y from model inputs.
         inflation: Multiplicative inflation factor.
         perturbed_obs: If True, use perturbed observations.
+        store_predicted_ensemble: Whether to store the incoming forecast ensemble.
+        modify_cross_covariance: Function that modifies the empirical
+            state-observation cross-covariance using the current model inputs.
+            Defaults to the identity.
+        construct_chol_innovation_covariance: Optional function that
+            constructs a generalized Cholesky factor of the localized innovation
+            covariance matrix. ``None`` (default) uses the standard, unlocalized
+            form of the ensemble Kalman update.
 
     Returns:
         Updated EnKF state.
@@ -215,13 +263,27 @@ def filter_combine(
 
     # Update
     observation_fn, chol_R, y = get_observations(state_2.model_inputs)
-    updated, ll = enkf_lib.update(
+    cross_covariance_modifier = partial(
+        modify_cross_covariance, model_inputs=state_2.model_inputs
+    )
+    construct_chol_S = (
+        None
+        if construct_chol_innovation_covariance is None
+        else partial(
+            construct_chol_innovation_covariance,
+            model_inputs=state_2.model_inputs,
+        )
+    )
+
+    updated, ll = enkf_lib.filter_update(
         key_update,
         predicted,
         observation_fn,
         chol_R,
         y,
         perturbed_obs,
+        cross_covariance_modifier=cross_covariance_modifier,
+        construct_chol_innovation_covariance=construct_chol_S,
     )
 
     return EnKFState(
@@ -229,4 +291,5 @@ def filter_combine(
         ensemble=updated,
         model_inputs=state_2.model_inputs,
         log_normalizing_constant=state_1.log_normalizing_constant + ll,
+        predicted_ensemble=predicted if store_predicted_ensemble else None,
     )
