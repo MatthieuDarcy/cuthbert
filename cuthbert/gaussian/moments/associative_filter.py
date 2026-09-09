@@ -8,12 +8,12 @@ from cuthbert.gaussian.types import LinearizedKalmanFilterState
 from cuthbert.utils import dummy_tree_like
 from cuthbertlib.kalman import filtering
 from cuthbertlib.linearize import linearize_moments
-from cuthbertlib.types import Array, ArrayTreeLike, KeyArray
+from cuthbertlib.types import ArrayLike, ArrayTreeLike, KeyArray
 
 
 def init_prepare(
-    m0: Array,
-    chol_P0: Array,
+    m0: ArrayLike,
+    chol_P0: ArrayLike,
     key: KeyArray | None = None,
 ) -> LinearizedKalmanFilterState:
     """Prepare the initial state for the linearized moments Kalman filter.
@@ -48,7 +48,7 @@ def init_prepare(
 
 def filter_prepare(
     model_inputs: ArrayTreeLike,
-    m0: Array,
+    m0: ArrayLike,
     get_dynamics_params: GetDynamicsMoments,
     get_observation_params: GetObservationMoments,
     key: KeyArray | None = None,

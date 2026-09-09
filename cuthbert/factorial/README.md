@@ -58,8 +58,8 @@ factorializer = cuthbert.factorial.gaussian.build_factorializer(get_factorial_in
 
 # Load inference method, with parameter extraction functions defined for factorial inference
 kalman_filter = cuthbert.gaussian.kalman.build_filter(
-    m0=m0,
-    chol_P0=chol_P0,  # Init specified to generate factorial state
+    m0=m0,   # Shape (F, d) i.e. includes factorial dimension
+    chol_P0=chol_P0,  # Shape (F, d, d)
     get_dynamics_params=get_dynamics_params,  # Dynamics specified to act on joint local state
     get_observation_params=get_observation_params,  # Observation specified to act on joint local state
 )

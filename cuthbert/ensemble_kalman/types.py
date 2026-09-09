@@ -15,9 +15,6 @@ class InitSample(Protocol):
     def __call__(self, key: KeyArray) -> Array:
         """Sample from the initial distribution.
 
-        Initial parameters must be captured by the callable, for example with
-        a closure or `functools.partial`.
-
         Args:
             key: JAX PRNG key.
 

@@ -49,7 +49,7 @@ def build_filter(
     r"""Builds a filter object for discrete hidden Markov models.
 
     Args:
-        init_dist: Initial state probabilities $m_i = p(x_0 = i)$.
+        init_dist: Array of initial state probabilities $m_i = p(x_0 = i)$.
         get_trans_matrix: Function to get the transition matrix $A_{ij} = p(x_t = j \mid x_{t-1} = i)$.
         get_obs_lls: Function to get observation log likelihoods $b_i = \log p(y_t | x_t = i)$.
 
@@ -70,7 +70,7 @@ def init_prepare(init_dist: Array, key: KeyArray | None = None) -> DiscreteFilte
     """Prepare the initial state for the filter.
 
     Args:
-        init_dist: Initial state probabilities m_i = p(x_0 = i).
+        init_dist: Array of initial state probabilities m_i = p(x_0 = i).
         key: JAX random key - not used.
 
     Returns:

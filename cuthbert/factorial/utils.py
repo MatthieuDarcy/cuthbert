@@ -76,26 +76,17 @@ def serial_to_factorial(
 
         initial_state = extract(init_factorial_tree, factorial_index)
 
-        def prepend_initial(initial, history):
-            if initial is None:
-                # Infer shapes without indexing: this factor may have no history.
-                initial = tree.map(
-                    lambda leaf: dummy_tree_like(
-                        jnp.empty(leaf.shape[1:], dtype=leaf.dtype)
-                    ),
-                    history,
-                )
-            return tree.map(
-                lambda first, rest: jnp.concatenate([first[None], rest]),
-                initial,
-                history,
-            )
+        dummy_model_inputs = dummy_tree_like(
+            tree.map(lambda x: x[0], factor_states.model_inputs)
+        )
+        initial_state = initial_state._replace(model_inputs=dummy_model_inputs)
 
         return tree.map(
-            prepend_initial,
+            lambda initial_leaf, history_leaf: jnp.concatenate(
+                [initial_leaf[None], history_leaf]
+            ),
             initial_state,
             factor_states,
-            is_leaf=lambda leaf: leaf is None,
         )
 
     factorial_trees = [

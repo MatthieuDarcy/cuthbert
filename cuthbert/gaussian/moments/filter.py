@@ -21,12 +21,12 @@ from functools import partial
 from cuthbert.gaussian.moments import associative_filter, non_associative_filter
 from cuthbert.gaussian.moments.types import GetDynamicsMoments, GetObservationMoments
 from cuthbert.inference import Filter
-from cuthbertlib.types import Array
+from cuthbertlib.types import ArrayLike
 
 
 def build_filter(
-    m0: Array,
-    chol_P0: Array,
+    m0: ArrayLike,
+    chol_P0: ArrayLike,
     get_dynamics_params: GetDynamicsMoments,
     get_observation_params: GetObservationMoments,
     associative: bool = False,

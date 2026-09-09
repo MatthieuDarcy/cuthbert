@@ -119,7 +119,7 @@ def init_prepare(
 
 def filter_prepare(
     model_inputs: ArrayTreeLike,
-    init_linearization_point: Array,
+    array_to_infer_shape: Array,
     key: KeyArray | None = None,
 ) -> LinearizedKalmanFilterState:
     """Prepare a state for a linearized Taylor Kalman filter step.
@@ -128,14 +128,15 @@ def filter_prepare(
 
     Args:
         model_inputs: Model inputs.
-        init_linearization_point: Initial linearization point, used to infer the state shape.
+        array_to_infer_shape: Array with shape matching state or mean, used to infer the
+            state shape.
         key: JAX random key - not used.
 
     Returns:
         Prepared state for linearized Taylor Kalman filter.
     """
     model_inputs = tree.map(lambda x: jnp.asarray(x), model_inputs)
-    dummy_mean = dummy_tree_like(init_linearization_point)
+    dummy_mean = dummy_tree_like(array_to_infer_shape)
     dummy_chol_cov = dummy_tree_like(
         jnp.empty(dummy_mean.shape + dummy_mean.shape[-1:], dtype=dummy_mean.dtype)
     )

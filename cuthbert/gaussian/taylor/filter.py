@@ -97,7 +97,7 @@ def build_filter(
             ),
             filter_prepare=partial(
                 associative_filter.filter_prepare,
-                init_linearization_point=init_linearization_point,
+                array_to_infer_shape=init_linearization_point,
                 get_dynamics_log_density=get_dynamics_log_density,
                 get_observation_func=get_observation_func,
                 rtol=rtol,
@@ -117,7 +117,7 @@ def build_filter(
             ),
             filter_prepare=partial(
                 non_associative_filter.filter_prepare,
-                init_linearization_point=init_linearization_point,
+                array_to_infer_shape=init_linearization_point,
             ),
             filter_combine=partial(
                 non_associative_filter.filter_combine,

@@ -67,7 +67,7 @@ def init_prepare(
 
 def filter_prepare(
     model_inputs: ArrayTreeLike,
-    init_linearization_point: Array,
+    array_to_infer_shape: Array,
     get_dynamics_log_density: GetDynamicsLogDensity,
     get_observation_func: GetObservationFunc,
     rtol: float | None = None,
@@ -81,7 +81,8 @@ def filter_prepare(
 
     Args:
         model_inputs: Model inputs.
-        init_linearization_point: Initial linearization point, used to infer the state shape.
+        array_to_infer_shape: Array with shape matching state or mean, used to infer the
+            state shape.
         get_dynamics_log_density: Function to get dynamics log density log p(x_t+1 | x_t)
             and linearization points (for the previous and current time points)
             `associative_scan` only supported when `state` is ignored.
@@ -104,7 +105,7 @@ def filter_prepare(
         Prepared state for linearized Taylor Kalman filter.
     """
     model_inputs = tree.map(lambda x: jnp.asarray(x), model_inputs)
-    dummy_mean = dummy_tree_like(init_linearization_point)
+    dummy_mean = dummy_tree_like(array_to_infer_shape)
     dummy_chol_cov = dummy_tree_like(
         jnp.empty(dummy_mean.shape + dummy_mean.shape[-1:], dtype=dummy_mean.dtype)
     )

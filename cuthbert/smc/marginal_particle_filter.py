@@ -38,8 +38,8 @@ def build_filter(
     r"""Builds a marginal particle filter object.
 
     Args:
-        init_sample: Function of a JAX random key only, sampling from $M_0(x_0)$.
-            Bind initial parameters in this callable when building the filter.
+        init_sample: Function of a JAX random key only, generates a single sample
+            from $M_0(x_0)$.
         propagate_sample: Function to sample from the Markov kernel $M_t(x_t \mid x_{t-1})$.
         log_potential: Function to compute the log potential $\log G_t(x_{t-1}, x_t)$.
         n_filter_particles: Number of particles for the filter.
@@ -80,8 +80,8 @@ def init_prepare(
     """Prepare the initial state for the marginal particle filter.
 
     Args:
-        init_sample: Function of a JAX random key only, sampling from M_0(x_0).
-            Bind initial parameters when building the filter.
+        init_sample: Function of a JAX random key only, generates a single sample
+            from $M_0(x_0)$.
         n_filter_particles: Number of particles to sample.
         key: JAX random key.
 
@@ -125,9 +125,8 @@ def filter_prepare(
 
     Args:
         model_inputs: Model inputs.
-        init_sample: Function of a JAX random key only, sampling from M_0(x_0).
-            Bind initial parameters when building the filter.
-            Only used to infer particle shapes.
+        init_sample: Function of a JAX random key only, generates a single sample
+            from $M_0(x_0)$. Only used to infer particle shapes.
         n_filter_particles: Number of particles for the filter.
         key: JAX random key.
 

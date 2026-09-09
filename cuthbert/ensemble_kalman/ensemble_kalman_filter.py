@@ -81,8 +81,8 @@ def build_filter(
     """Builds an Ensemble Kalman Filter object.
 
     Args:
-        init_sample: Function of a JAX random key only, sampling from the initial
-            distribution. Bind initial parameters when building the filter.
+        init_sample: Function of a JAX random key only, generates a single sample from
+            the initial distribution.
         get_dynamics: Function to get dynamics function (x_t, key) -> x_{t+1} ~ p(x_{t+1} | x_t) from model inputs.
         get_observations: Function to get observation function, chol_R, and y from model inputs.
         n_particles: Number of particles.
@@ -143,8 +143,8 @@ def init_prepare(
     """Prepare the initial state for the EnKF.
 
     Args:
-        init_sample: Function of a JAX random key only, sampling from the initial
-            distribution. Bind initial parameters when building the filter.
+        init_sample: Function of a JAX random key only, generates a single sample from
+            the initial distribution.
         n_particles: Number of particles.
         store_predicted_ensemble: Whether to store incoming forecast ensembles.
         key: JAX random key.

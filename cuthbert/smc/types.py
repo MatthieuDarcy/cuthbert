@@ -16,14 +16,11 @@ class InitSample(Protocol):
     def __call__(self, key: KeyArray) -> ArrayTree:
         """Samples from the initial distribution $M_0(x_0)$.
 
-        Initial parameters must be captured by the callable, for example with
-        a closure or `functools.partial`.
-
         Args:
             key: JAX PRNG key.
 
         Returns:
-            A sample $x_0$.
+            A single sample $x_0$.
         """
         ...
 
