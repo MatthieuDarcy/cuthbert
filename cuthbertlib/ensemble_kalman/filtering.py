@@ -150,17 +150,23 @@ def update(
             original_chol_S,
         )
 
-    # Kalman gain: K = C_xy @ S^{-1} = C_xy @ cho_solve(chol_S, I)
-    K = cho_solve((chol_S, True), C_xy.T).T
-
     # Innovation per member
     if perturbed_obs:
         y_n = y[None, :] + (chol_R @ random.normal(key, (y_dim, N))).T
     else:
         y_n = jnp.broadcast_to(y[None, :], (N, y_dim))
 
+    innovations = y_n - y_pred
+
+    # Doing K = C_xy @ S^{-1}\delta right to left has cost O(Nd_y^2 + Nd_yd_x), left to right O(d_xd_y^2 + Nd_yd_x).
+    # If N < d_x, then right to left is cheaper; otherwise left to right is cheaper.
+    if N < x_dim:
+        increment = cho_solve((chol_S, True), innovations.T).T @ C_xy.T
+    else:
+        increment = innovations @ cho_solve((chol_S, True), C_xy.T)
+
     # Update ensemble
-    updated = predicted_ensemble + (y_n - y_pred) @ K.T
+    updated = predicted_ensemble + increment
 
     # Log-likelihood
     ll = multivariate_normal.logpdf(y, y_mean, chol_S, nan_support=False)
