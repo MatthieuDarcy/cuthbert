@@ -130,9 +130,7 @@ def test_factorial_smc_filter(
         build_pairwise_factorial_filter(model_params)
     )
     init_state = kalman_filter.init_prepare()
-    init_state = kalman_factorializer.factorialize_init_state(
-        init_state, kalman_model_inputs[0]
-    )
+    init_state = kalman_factorializer.factorialize_init_state(init_state)
     kalman_states = factorial.filter(
         kalman_filter,
         kalman_factorializer,
@@ -152,14 +150,11 @@ def test_factorial_smc_filter(
     smc_filter, smc_factorializer, smc_model_inputs = build_factorial_smc_filter(
         model_params, n_particles=num_particles
     )
-    smc_init_model_inputs = tree.map(lambda x: x[0], smc_model_inputs)
     smc_filter_model_inputs = tree.map(lambda x: x[1:], smc_model_inputs)
 
     init_key, filter_key = random.split(random.key(seed + 123))
     init_smc_state = smc_filter.init_prepare(key=init_key)
-    init_smc_state = smc_factorializer.factorialize_init_state(
-        init_smc_state, smc_init_model_inputs
-    )
+    init_smc_state = smc_factorializer.factorialize_init_state(init_smc_state)
     smc_states = factorial.filter(
         smc_filter,
         smc_factorializer,

@@ -331,11 +331,10 @@ We'll use `cuthbert.factorial.filter` to easily
 run offline filtering on our data.
 
 ```{.python #factorial-football-run-filter}
-init_match_data = tree.map(lambda x: x[0], match_data)
 filter_match_data = tree.map(lambda x: x[1:], match_data)
 
 init_state = football_filter.init_prepare()
-init_state = factorializer.factorialize_init_state(init_state, init_match_data)
+init_state = factorializer.factorialize_init_state(init_state)
 
 local_filter_states, final_factorial_state = factorial.filter(
     football_filter, factorializer, filter_match_data, init_state

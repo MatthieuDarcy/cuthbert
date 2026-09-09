@@ -93,11 +93,11 @@ def test_synchronize_discrete():
 
 
 def test_synchronize_particle_filter():
-    initial_model_inputs = jnp.array([1.0, 10.0])
+    initial_values = jnp.array([1.0, 10.0])
     model_inputs = jnp.array([0.5, -1.0])
 
     filter_obj = build_particle_filter(
-        init_sample=lambda key: initial_model_inputs,
+        init_sample=lambda key: initial_values,
         propagate_sample=lambda key, particle, increment: particle + increment,
         log_potential=lambda previous, particle, increment: jnp.array(0.0),
         n_filter_particles=3,
@@ -112,7 +112,6 @@ def test_synchronize_particle_filter():
     )
     initial_state = factorializer.factorialize_init_state(
         filter_obj.init_prepare(key=random.key(0)),
-        initial_model_inputs,
     )
     true_particles = vmap(lambda particles, increment: particles + increment)(
         initial_state.particles, model_inputs

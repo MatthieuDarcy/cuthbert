@@ -60,11 +60,10 @@ def test_factorial_taylor_filter_jit():
     factorializer = factorial.gaussian.build_factorializer(
         lambda model_inputs: factorial_indices[model_inputs - 1]
     )
-    init_model_inputs = jnp.array(0)
     filter_model_inputs = jnp.arange(1, num_time_steps + 1)
 
     init_state = filter_obj.init_prepare()
-    init_state = factorializer.factorialize_init_state(init_state, init_model_inputs)
+    init_state = factorializer.factorialize_init_state(init_state)
     local_filter_states, _ = jax.jit(
         factorial.filter,
         static_argnames=("filter_obj", "factorializer", "output_factorial"),
