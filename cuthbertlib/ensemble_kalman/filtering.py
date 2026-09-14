@@ -127,31 +127,8 @@ def _log_det_from_chol(chol: Array) -> ScalarArray:
     return 2 * jnp.sum(jnp.log(jnp.abs(diagonal)))
 
 
-def _quadratic_form_difference(A: Array, z: Array, chol_C: Array) -> ScalarArray:
-    r"""Directly evaluates the quadratic form.
-
-    $$z^\top z - z^\top AC^{-1}A^\top z$$
-
-    where $C = L_CL_C^\top$.
-
-    Both terms are non-negative but the subtraction loses relative precision.
-    This form is kept as a transparent statement of the identity; the accurate path is
-    [_quadratic_form_residual][cuthbertlib.ensemble_kalman.filtering._quadratic_form_residual].
-
-    Args:
-        A: matrix, shape (y_dim, N).
-        z: vector, shape (y_dim,).
-        chol_C: Generalized lower-triangular factor $L_C$ of $C$, shape (N, N).
-
-    Returns:
-        Scalar quadratic form.
-    """
-    g = A.T @ z
-    return z @ z - jnp.sum(jnp.square(solve_triangular(chol_C, g, lower=True)))
-
-
 def _quadratic_form_residual(A: Array, z: Array) -> ScalarArray:
-    r"""Evaluates the same quadratic form as a least-squares residual.
+    r"""Evaluates a quadratic form as a least-squares residual.
 
     $$z^\top z - z^\top AC^{-1}A^\top z$$
 
@@ -166,9 +143,9 @@ def _quadratic_form_residual(A: Array, z: Array) -> ScalarArray:
     factorization $[A;\,I_N] = QW$, the residual of the orthogonal projection of $b$
     onto the column space.
 
-    Nothing of comparable size is subtracted and the minimizer is never formed, so
-    relative accuracy does not degrade. The identity block also makes $[A;\,I_N]$ full
-    column rank whatever the rank of $A$.
+    Unlike evaluating the difference directly, nothing of comparable size is subtracted
+    and the minimizer is never formed, so relative accuracy does not degrade. The
+    identity block also makes $[A;\,I_N]$ full column rank whatever the rank of $A$.
 
     Args:
         A: matrix, shape (y_dim, N).
@@ -229,7 +206,6 @@ def update(
     construct_chol_innovation_covariance: ConstructCholInnovationCovariance
     | None = None,
     ensemble_subspace: bool = False,
-    cancellation_free_log_likelihood: bool = True,
 ) -> tuple[Array, ScalarArray]:
     """Update ensemble members with an observation using the EnKF update.
 
@@ -266,10 +242,6 @@ def update(
             O(N * x_dim * y_dim), so it is preferable when ``N << y_dim``. It is
             incompatible with both localization arguments above, which it rejects.
             Defaults to False; the choice is never made automatically.
-        cancellation_free_log_likelihood: Only used when ``ensemble_subspace`` is
-            True. If True (default), evaluate the innovation quadratic form as a sum
-            of squares; if False, as the difference given directly by the Woodbury
-            identity. The two agree in exact arithmetic and differ in floating point.
 
     Returns:
         Tuple of (updated_ensemble, log_likelihood).
@@ -298,7 +270,6 @@ def update(
             chol_R,
             y,
             perturbed_obs,
-            cancellation_free_log_likelihood,
         )
 
     if jnp.ndim(chol_R) != 2:
@@ -384,7 +355,6 @@ def _update_ensemble_subspace(
     chol_R: Array,
     y: Array,
     perturbed_obs: bool,
-    cancellation_free_log_likelihood: bool,
 ) -> tuple[Array, ScalarArray]:
     r"""EnKF update carried out in the N-dimensional ensemble subspace.
 
@@ -398,11 +368,8 @@ def _update_ensemble_subspace(
     Working in whitened coordinates $A = \mathrm{chol}_R^{-1}Y$ makes
     $C = I_N + A^\top A$, whose factor is obtained by
     [tria][cuthbertlib.linalg.tria] without forming $C$. The log-likelihood follows
-    from $\log\det S = \log\det R + \log\det C$ and the quadratic form of either
-    [_quadratic_form_residual][cuthbertlib.ensemble_kalman.filtering._quadratic_form_residual]
-    or
-    [_quadratic_form_difference][cuthbertlib.ensemble_kalman.filtering._quadratic_form_difference],
-    both of which reuse the factor $L_C$ built for the gain.
+    from $\log\det S = \log\det R + \log\det C$, with the quadratic form evaluated by
+    [_quadratic_form_residual][cuthbertlib.ensemble_kalman.filtering._quadratic_form_residual].
 
     Args:
         key: JAX PRNG key.
@@ -412,7 +379,6 @@ def _update_ensemble_subspace(
             as a scalar, a 1D array of shape (y_dim,), or a 2D array.
         y: Observation vector, shape (y_dim,). NaNs indicate missing dimensions.
         perturbed_obs: If True, use perturbed observations (stochastic EnKF).
-        cancellation_free_log_likelihood: Select the quadratic-form evaluation.
 
     Returns:
         Tuple of (updated_ensemble, log_likelihood).
@@ -464,14 +430,9 @@ def _update_ensemble_subspace(
     # The log-likelihood uses the unperturbed innovation about the ensemble mean, which
     # is a different object from the per-member innovations driving the update above.
     whitened_mean_innovation = _whiten(chol_R, y - y_mean)
-    if cancellation_free_log_likelihood:
-        quadratic_form = _quadratic_form_residual(
-            whitened_anomalies, whitened_mean_innovation
-        )
-    else:
-        quadratic_form = _quadratic_form_difference(
-            whitened_anomalies, whitened_mean_innovation, chol_C
-        )
+    quadratic_form = _quadratic_form_residual(
+        whitened_anomalies, whitened_mean_innovation
+    )
 
     log_det = _log_det_from_chol(chol_R) + _log_det_from_chol(chol_C)
     ll = -0.5 * (y_dim * jnp.log(2 * jnp.pi) + log_det + quadratic_form)
