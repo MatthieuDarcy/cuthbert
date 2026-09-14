@@ -500,24 +500,29 @@ def test_update_ensemble_subspace_missing_observations():
     chex.assert_trees_all_close(ll, jnp.array(0.0), atol=1e-12)
 
 
+@pytest.mark.parametrize("perturbed_obs", [True, False])
 @pytest.mark.parametrize("form", ["scalar", "diagonal", "dense"])
-def test_update_ensemble_subspace_chol_R_forms(form):
-    """Scalar, 1D and 2D factors of the same isotropic R reproduce the dense update.
+def test_update_ensemble_subspace_chol_R_forms(form, perturbed_obs):
+    """Scalar, 1D and 2D factors of the same R reproduce the dense update.
 
-    Compared with perturbed_obs=False, since distinct factorizations of one R give
-    different perturbation draws from the same key.
+    The diagonal and dense cases use unequal standard deviations, so that scaling the
+    perturbations along the wrong axis would be detected. With nothing missing, no
+    factor is refactored, so both paths draw identical perturbations from one key.
     """
-    y_dim, sigma = 8, 0.7
+    y_dim = 8
     ensemble, observation_fn, _, y = _random_update_problem(6, y_dim, 5)
-    chol_R = {
-        "scalar": jnp.asarray(sigma),
-        "diagonal": jnp.full((y_dim,), sigma),
-        "dense": sigma * jnp.eye(y_dim),
-    }[form]
+    if form == "scalar":
+        std = jnp.full((y_dim,), 0.7)
+        chol_R = jnp.asarray(0.7)
+    else:
+        std = 0.4 + 0.1 * jnp.arange(y_dim)
+        chol_R = std if form == "diagonal" else jnp.diag(std)
     args = (random.key(1), ensemble, observation_fn)
 
-    expected = update(*args, sigma * jnp.eye(y_dim), y, perturbed_obs=False)
-    actual = update(*args, chol_R, y, perturbed_obs=False, ensemble_subspace=True)
+    expected = update(*args, jnp.diag(std), y, perturbed_obs=perturbed_obs)
+    actual = update(
+        *args, chol_R, y, perturbed_obs=perturbed_obs, ensemble_subspace=True
+    )
 
     chex.assert_trees_all_close(actual, expected, rtol=1e-10, atol=1e-10)
 

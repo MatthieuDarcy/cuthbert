@@ -222,7 +222,10 @@ def update(
             of the identity) or a 1D array of shape (y_dim,) (a diagonal factor).
             Prefer those forms when the structure allows: a 2D factor must be applied
             by triangular solve, at O(N * y_dim ** 2) instead of O(N * y_dim), and
-            stored densely in y_dim ** 2 entries.
+            stored densely in y_dim ** 2 entries. On either path, a 2D factor is also
+            refactored in O(y_dim ** 3) at any step where ``y`` has missing values,
+            whereas scalar and 1D factors handle missingness in O(y_dim). Steps with
+            nothing missing skip the refactor.
         y: Observation vector, shape (y_dim,). NaNs indicate missing dimensions.
         perturbed_obs: If True, use perturbed observations (stochastic EnKF).
             If False, use deterministic update.
@@ -303,7 +306,14 @@ def update(
 
     # Handle partially-missing observations by reordering and zeroing missing dims.
     # Use y_pred.T because y_pred is (N, y_dim) and we want to reorder along axis 0.
-    flag, chol_R, y, y_pred = collect_nans_chol(missing, chol_R, y, y_pred.T)
+    # Refactoring chol_R is O(y_dim ** 3); skip it when nothing is missing, in which
+    # case the reordering is the identity and the inputs are returned unchanged.
+    flag, chol_R, y, y_pred = jax.lax.cond(
+        jnp.any(missing),
+        lambda args: collect_nans_chol(missing, *args[1:]),
+        lambda args: args,
+        (missing, chol_R, y, y_pred.T),
+    )
     y_pred = y_pred.T
     y_dim = y.shape[0]
 
@@ -392,7 +402,18 @@ def _update_ensemble_subspace(
     # Handle partially-missing observations by reordering and zeroing missing dims.
     # Use y_pred.T because y_pred is (N, y_dim) and we want to reorder along axis 0.
     missing = jnp.isnan(y)
-    _, chol_R, y, y_pred = collect_nans_chol(missing, chol_R, y, y_pred.T)
+    if jnp.ndim(chol_R) == 2:
+        # Refactoring a dense factor is O(y_dim ** 3); skip it when nothing is missing.
+        # Scalar and 1D factors are handled in O(y_dim), and a scalar is promoted to 1D,
+        # so an identity branch would not match shapes there.
+        chol_R, y, y_pred = jax.lax.cond(
+            jnp.any(missing),
+            lambda args: collect_nans_chol(missing, *args)[1:],
+            lambda args: args,
+            (chol_R, y, y_pred.T),
+        )
+    else:
+        _, chol_R, y, y_pred = collect_nans_chol(missing, chol_R, y, y_pred.T)
     y_pred = y_pred.T
     y_dim = y.shape[0]
 

@@ -108,6 +108,8 @@ def build_filter(
             applied by triangular solve rather than by scaling, which restores a
             quadratic dependence on the observation dimension and requires storing
             the factor densely; both are avoided entirely by the structured forms.
+            A dense factor is also refactored at cubic cost in the observation
+            dimension at every step with missing observations.
 
     Returns:
         Filter object for the EnKF.
