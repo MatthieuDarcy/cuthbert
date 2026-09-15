@@ -8,18 +8,15 @@ from cuthbertlib.types import ArrayTree, ArrayTreeLike, KeyArray
 class InitPrepare(Protocol):
     """Protocol for preparing the initial state for the inference."""
 
-    def __call__(
-        self,
-        model_inputs: ArrayTreeLike,
-        *,
-        key: KeyArray | None = None,
-    ) -> ArrayTree:
+    def __call__(self, *, key: KeyArray | None = None) -> ArrayTree:
         """Prepare the initial state for the inference.
 
-        The state at the first time point, prior to any observations.
+        The state at the first time point, prior to any observations. Initial
+        parameters are supplied when building the filter. The returned state has
+        `model_inputs=None`; offline filtering pads this field to match the step
+        input tree.
 
         Args:
-            model_inputs: The model inputs at the first time point.
             key: The key for the random number generator.
                 Optional, as only used for stochastic inference methods
 
