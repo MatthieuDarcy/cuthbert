@@ -7,6 +7,7 @@ from jax import random, tree, vmap
 from jax.lax import associative_scan, scan
 
 from cuthbert.inference import Filter
+from cuthbert.utils import dummy_leading_element
 from cuthbertlib.types import ArrayTree, ArrayTreeLike, KeyArray
 
 
@@ -52,6 +53,8 @@ def filter(
         prepare_keys = jnp.empty(T)
     else:
         prepare_keys = random.split(key, T)
+
+    init_state = init_state._replace(model_inputs=dummy_leading_element(model_inputs))
 
     if parallel:
         other_prep_states = vmap(lambda inp, k: filter_obj.filter_prepare(inp, key=k))(
